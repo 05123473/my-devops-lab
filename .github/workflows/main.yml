@@ -1,16 +1,28 @@
-name: My First CI  # 流水线的名字
+name: Deploy to GitHub Pages
 
-on: [push] # 触发条件：只要有代码推送到仓库，就启动
+on:
+  push:
+    branches: ["main"] # 只有在主分支有变动时才发布
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
-  check-code:      # 任务：检查代码
-    runs-on: ubuntu-latest  # 运行环境：GitHub 提供的免费 Linux 虚拟机
+  deploy:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4 # 第一步：把你的代码下载到这台虚拟机上
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Simple HTML Lint
-        run: |
-          echo "正在检查网页文件..."
-          grep -q "<html>" index.html || echo "警告：未发现 html 标签，但流水线继续"
-          echo "检查完毕！"
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.' # 告诉它上传当前目录的所有文件
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
