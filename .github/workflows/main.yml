@@ -1,0 +1,16 @@
+name: My First CI  # 流水线的名字
+
+on: [push] # 触发条件：只要有代码推送到仓库，就启动
+
+jobs:
+  check-code:      # 任务：检查代码
+    runs-on: ubuntu-latest  # 运行环境：GitHub 提供的免费 Linux 虚拟机
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # 第一步：把你的代码下载到这台虚拟机上
+
+      - name: Simple HTML Lint
+        run: |
+          echo "正在检查网页文件..."
+          grep -q "<html>" index.html || echo "警告：未发现 html 标签，但流水线继续"
+          echo "检查完毕！"
