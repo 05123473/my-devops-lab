@@ -1,52 +1,36 @@
-name: Docker Auto Deploy to Home PC
+name: Docker Auto Deploy
 
-# 触发条件：当 main 分支有代码 push 时执行
 on:
   push:
     branches: [ "main" ]
 
 jobs:
   build-and-deploy:
-    # 关键：指定使用你本地配置好的自托管 Runner
     runs-on: self-hosted
 
     steps:
-      # 第一步：拉取仓库代码到本地 Runner 工作目录
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      # 第二步：使用 PowerShell 执行 Docker 自动化指令
       - name: Build and Run Docker Container
         shell: powershell
         run: |
-          Write-Host ">>> 开始自动化部署流程 <<<"
+          Write-Host ">>> Starting Deployment <<<"
 
-          # 1. 定义变量（方便后续维护修改）
-          $imageName = "my-web-app"
-          $containerName = "my-web-site"
-          $externalPort = "8080"
+          # 1. 直接尝试停止并删除旧容器 (加上 || $true 是为了防止报错导致任务中断)
+          # 在 PowerShell 中我们使用 try-catch 或者简单的错误忽略
+          docker stop my-web-site 2>$null
+          docker rm my-web-site 2>$null
 
-          # 2. 幂等性清理：检查是否有同名容器在运行
-          # docker ps -a -q 会返回容器 ID，如果没有则返回空
-          $existingContainer = docker ps -a -q --filter "name=$containerName"
-          
-          if ($existingContainer) {
-              Write-Host "发现旧容器 [$containerName]，正在停止并删除..."
-              docker stop $containerName
-              docker rm $containerName
-              Write-Host "旧容器清理完毕。"
-          }
+          # 2. 构建镜像
+          Write-Host "Building image..."
+          docker build -t my-web-app .
 
-          # 3. 构建 Docker 镜像
-          Write-Host "正在构建新镜像: $imageName..."
-          # . 代表 Dockerfile 所在的当前路径
-          docker build -t $imageName .
+          # 3. 启动容器
+          Write-Host "Running container on port 8080..."
+          docker run -d --name my-web-site -p 8080:80 my-web-app
 
-          # 4. 启动新容器
-          Write-Host "正在启动容器，映射端口 $externalPort -> 80..."
-          docker run -d --name $containerName -p "${externalPort}:80" $imageName
-
-          # 5. 最终验证
-          Write-Host ">>> 部署成功！<<<"
-          Write-Host "你现在可以访问: http://localhost:$externalPort"
-          docker ps --filter "name=$containerName"
+          # 4. 检查结果
+          Write-Host "Checking status..."
+          docker ps --filter "name=my-web-site"
+          Write-Host ">>> Done! Visit http://localhost:8080 <<<"
