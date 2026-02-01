@@ -1,34 +1,52 @@
-name: Windows Local Deploy  # 流水线名称
+name: Docker Auto Deploy to Home PC
 
+# 触发条件：当 main 分支有代码 push 时执行
 on:
   push:
-    branches: [ "main" ]    # 当代码推送到 main 分支时触发
+    branches: [ "main" ]
 
 jobs:
-  deploy-to-pc:
-    runs-on: self-hosted    # 关键！告诉 GitHub 使用你本地的 Windows Runner
-    
+  build-and-deploy:
+    # 关键：指定使用你本地配置好的自托管 Runner
+    runs-on: self-hosted
+
     steps:
-      # 1. 从 GitHub 仓库拉取最新的代码到你电脑的临时文件夹
-      - name: Checkout Code
+      # 第一步：拉取仓库代码到本地 Runner 工作目录
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      # 2. 使用 PowerShell 执行具体的部署动作
-      - name: Deploy to Local Folder
-        shell: powershell    # 明确指定使用 PowerShell 执行命令
+      # 第二步：使用 PowerShell 执行 Docker 自动化指令
+      - name: Build and Run Docker Container
+        shell: powershell
         run: |
-          # 定义目标文件夹路径
-          $destDir = "D:\Devops\my-devops-runner"
+          Write-Host ">>> 开始自动化部署流程 <<<"
+
+          # 1. 定义变量（方便后续维护修改）
+          $imageName = "my-web-app"
+          $containerName = "my-web-site"
+          $externalPort = "8080"
+
+          # 2. 幂等性清理：检查是否有同名容器在运行
+          # docker ps -a -q 会返回容器 ID，如果没有则返回空
+          $existingContainer = docker ps -a -q --filter "name=$containerName"
           
-          # 如果文件夹不存在，则创建一个
-          if (!(Test-Path $destDir)) {
-              New-Item -ItemType Directory -Path $destDir
-              Write-Host "创建了新目录: $destDir"
+          if ($existingContainer) {
+              Write-Host "发现旧容器 [$containerName]，正在停止并删除..."
+              docker stop $containerName
+              docker rm $containerName
+              Write-Host "旧容器清理完毕。"
           }
-          
-          # 将刚才下载的 index.html 拷贝到目标文件夹
-          # $GITHUB_WORKSPACE 是 GitHub 默认的代码存放位置
-          Copy-Item -Path "index.html" -Destination "$destDir\index.html" -Force
-          
-          Write-Host "--- 部署成功 ---"
-          Write-Host "你现在可以去 $destDir 看看你的网页了！"
+
+          # 3. 构建 Docker 镜像
+          Write-Host "正在构建新镜像: $imageName..."
+          # . 代表 Dockerfile 所在的当前路径
+          docker build -t $imageName .
+
+          # 4. 启动新容器
+          Write-Host "正在启动容器，映射端口 $externalPort -> 80..."
+          docker run -d --name $containerName -p "${externalPort}:80" $imageName
+
+          # 5. 最终验证
+          Write-Host ">>> 部署成功！<<<"
+          Write-Host "你现在可以访问: http://localhost:$externalPort"
+          docker ps --filter "name=$containerName"
