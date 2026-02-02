@@ -1,36 +1,33 @@
-name: Docker Auto Deploy
+name: Docker Auto Push and Deploy
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: self-hosted
-
     steps:
-      - name: Checkout Source Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Build and Run Docker Container
+      # 使用你配置好的 Secrets 自动登录 (cx0512)
+      - name: Login to Docker Hub
         shell: powershell
         run: |
-          Write-Host ">>> Starting Deployment <<<"
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "cx0512" --password-stdin
 
-          # 1. 直接尝试停止并删除旧容器 (加上 || $true 是为了防止报错导致任务中断)
-          # 在 PowerShell 中我们使用 try-catch 或者简单的错误忽略
+      # 构建并推送
+      - name: Build and Push
+        shell: powershell
+        run: |
+          docker build -t cx0512/my-web-app:latest .
+          docker push cx0512/my-web-app:latest
+
+      # 本地重新部署
+      - name: Local Deploy
+        shell: powershell
+        run: |
           docker stop my-web-site 2>$null
           docker rm my-web-site 2>$null
-
-          # 2. 构建镜像
-          Write-Host "Building image..."
-          docker build -t my-web-app .
-
-          # 3. 启动容器
-          Write-Host "Running container on port 8080..."
-          docker run -d --name my-web-site -p 8080:80 my-web-app
-
-          # 4. 检查结果
-          Write-Host "Checking status..."
-          docker ps --filter "name=my-web-site"
-          Write-Host ">>> Done! Visit http://localhost:8080 <<<"
+          docker run -d --name my-web-site -p 8080:80 cx0512/my-web-app:latest
