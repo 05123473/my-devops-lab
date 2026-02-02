@@ -15,8 +15,9 @@ jobs:
       - name: Login to Docker Hub
         shell: powershell
         run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "cx0512" --password-stdin
-
+          # 使用变量来中转 Token，防止特殊字符转义失败
+          $token = "${{ secrets.DOCKER_PASSWORD }}"
+          echo $token | docker login -u "cx0512" --password-stdin
       # 构建并推送
       - name: Build and Push
         shell: powershell
