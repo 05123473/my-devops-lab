@@ -11,24 +11,39 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 使用你配置好的 Secrets 自动登录 (cx0512)
+      # 1. 登录 Docker Hub
+      # 使用 .Trim() 确保 Token 前后没有空格，彻底解决 unauthorized 报错
       - name: Login to Docker Hub
         shell: powershell
         run: |
-          # 使用变量来中转 Token，防止特殊字符转义失败
-          $token = "${{ secrets.DOCKER_PASSWORD }}"
-          echo $token | docker login -u "cx0512" --password-stdin
-      # 构建并推送
-      - name: Build and Push
+          $token = "${{ secrets.DOCKER_PASSWORD }}".Trim()
+          if (-not $token) {
+              Write-Error "DOCKER_PASSWORD secret 可能是空的，请检查 GitHub Settings!"
+              exit 1
+          }
+          $token | docker login -u "cx0512" --password-stdin
+
+      # 2. 构建镜像
+      # 打上两个标签：一个是最新的 latest，一个是根据运行编号生成的版本号
+      - name: Build Docker Image
         shell: powershell
         run: |
           docker build -t cx0512/my-web-app:latest .
-          docker push cx0512/my-web-app:latest
+          docker build -t cx0512/my-web-app:v${{ github.run_number }} .
 
-      # 本地重新部署
+      # 3. 推送到云端 Docker Hub
+      - name: Push to Docker Hub
+        shell: powershell
+        run: |
+          docker push cx0512/my-web-app:latest
+          docker push cx0512/my-web-app:v${{ github.run_number }}
+
+      # 4. 本地清理旧容器并重新部署
+      # 即使没有旧容器，2>$null 也能让流水线继续运行而不报错
       - name: Local Deploy
         shell: powershell
         run: |
+          Write-Host ">>> 正在更新本地部署 <<<"
           docker stop my-web-site 2>$null
           docker rm my-web-site 2>$null
           docker run -d --name my-web-site -p 8080:80 cx0512/my-web-app:latest
